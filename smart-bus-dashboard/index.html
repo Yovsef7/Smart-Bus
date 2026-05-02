@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Bus Live Dashboard</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b0f14;
+      color: white;
+    }
+
+    header {
+      padding: 20px 30px;
+      background: #111827;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #263244;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .status {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      padding: 20px;
+      height: calc(100vh - 80px);
+    }
+
+    .panel {
+      background: #111827;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.45);
+      border: 1px solid #253044;
+    }
+
+    .card {
+      background: #1f2937;
+      padding: 18px;
+      border-radius: 15px;
+      margin-bottom: 15px;
+    }
+
+    .card h2 {
+      margin-top: 0;
+    }
+
+    .label {
+      color: #b7c0cc;
+      margin: 12px 0;
+    }
+
+    .value {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .danger {
+      color: #ff4d4d;
+      font-weight: bold;
+    }
+
+    .warning {
+      color: #ffd166;
+      font-weight: bold;
+    }
+
+    .progress {
+      width: 100%;
+      height: 14px;
+      background: #374151;
+      border-radius: 20px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: #00ff88;
+      transition: 0.4s;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      border-radius: 18px;
+      border: 1px solid #253044;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #0f766e;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .footer {
+      font-size: 13px;
+      color: #8b95a5;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚌 Smart Bus Tracking Dashboard</h1>
+  <div>System Status: <span class="status">LIVE</span></div>
+</header>
+
+<div class="container">
+
+  <div class="panel">
+    <div class="card">
+      <h2>Bus Information</h2>
+
+      <p class="label">Bus ID: <span id="busId" class="value">--</span></p>
+      <p class="label">Latitude: <span id="lat" class="value">--</span></p>
+      <p class="label">Longitude: <span id="lon" class="value">--</span></p>
+      <p class="label">Last Update: <span id="lastUpdate" class="value">--</span></p>
+
+      <span class="badge">Raspberry Pi Active</span>
+    </div>
+
+    <div class="card">
+      <h2>Occupancy</h2>
+
+      <p class="label">
+        Passengers:
+        <span id="occ" class="value">--</span>
+      </p>
+
+      <div class="progress">
+        <div id="occBar" class="bar"></div>
+      </div>
+
+      <p class="label">
+        Status:
+        <span id="occStatus" class="value">--</span>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>ETA</h2>
+
+      <p class="label">
+        Estimated Arrival:
+        <span id="eta" class="value">--</span>
+      </p>
+
+      <p class="label">
+        Next Stop:
+        <span class="value">Alamein Central Stop</span>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Emergency</h2>
+      <p class="label">
+        Emergency Status:
+        <span id="emergency" class="value">Normal</span>
+      </p>
+    </div>
+
+    <div class="footer">
+      Data Source: Raspberry Pi → MQTT → Node.js Backend → Dashboard
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map("map").setView([30.1234, 28.9876], 15);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const busIcon = L.divIcon({
+    html: "🚌",
+    className: "",
+    iconSize: [35, 35],
+    iconAnchor: [17, 17]
+  });
+
+  let busMarker = L.marker([30.1234, 28.9876], {
+    icon: busIcon
+  }).addTo(map);
+
+  busMarker.bindPopup("Bus 1");
+
+  const stopLat = 30.1255;
+  const stopLon = 28.9905;
+
+  L.marker([stopLat, stopLon]).addTo(map)
+    .bindPopup("Alamein Central Stop");
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function updateOccupancyColor(percent) {
+    const bar = document.getElementById("occBar");
+    const status = document.getElementById("occStatus");
+
+    bar.style.width = percent + "%";
+
+    if (percent < 60) {
+      bar.style.background = "#00ff88";
+      status.textContent = "Available";
+      status.className = "value";
+    } else if (percent < 90) {
+      bar.style.background = "#ffd166";
+      status.textContent = "Near Full";
+      status.className = "warning";
+    } else {
+      bar.style.background = "#ff4d4d";
+      status.textContent = "Full / Crowded";
+      status.className = "danger";
+    }
+  }
+
+  async function loadBusData() {
+    try {
+      const res = await fetch("http://localhost:3000/bus");
+      const data = await res.json();
+
+      if (!data || !data.bus_id) return;
+
+      const lat = Number(data.latitude);
+      const lon = Number(data.longitude);
+      const occupancy = Number(data.occupancy);
+      const maxCapacity = Number(data.max_capacity);
+
+      document.getElementById("busId").textContent = data.bus_id;
+      document.getElementById("lat").textContent = lat.toFixed(6);
+      document.getElementById("lon").textContent = lon.toFixed(6);
+      document.getElementById("occ").textContent = occupancy + "/" + maxCapacity;
+
+      const now = new Date();
+      document.getElementById("lastUpdate").textContent =
+        now.toLocaleTimeString();
+
+      const percent = Math.round((occupancy / maxCapacity) * 100);
+      updateOccupancyColor(percent);
+
+      busMarker.setLatLng([lat, lon]);
+      busMarker.setPopupContent(`
+        <b>Bus ${data.bus_id}</b><br>
+        Occupancy: ${occupancy}/${maxCapacity}<br>
+        GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}
+      `);
+
+      map.panTo([lat, lon]);
+
+      const distanceKm = calculateDistance(lat, lon, stopLat, stopLon);
+      const speedKmH = 40;
+      const etaMinutes = Math.max(1, Math.round((distanceKm / speedKmH) * 60));
+
+      document.getElementById("eta").textContent =
+        etaMinutes + " min";
+
+      if (data.emergency === true) {
+        document.getElementById("emergency").textContent = "Emergency Active";
+        document.getElementById("emergency").className = "danger";
+      } else {
+        document.getElementById("emergency").textContent = "Normal";
+        document.getElementById("emergency").className = "value";
+      }
+
+    } catch (error) {
+      console.log("Dashboard Error:", error);
+    }
+  }
+
+  loadBusData();
+  setInterval(loadBusData, 2000);
+</script>
+
+</body>
+</html>
