@@ -265,7 +265,7 @@
 
   async function loadBusData() {
     try {
-      const res = await fetch("http://localhost:3000/bus");
+      const res = await fetch("https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/prod/bus");
       const data = await res.json();
 
       if (!data || !data.bus_id) return;
