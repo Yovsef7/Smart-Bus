@@ -17,42 +17,65 @@
   />
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       font-family: 'Tajawal', sans-serif;
-      background-color: #f3f4f6;
+      background: linear-gradient(135deg, #f0f4f8 0%, #f8fafb 100%);
+      color: #1a202c;
     }
 
+    /* Responsive map height - mobile first */
     #map {
-      height: 540px;
+      height: 320px;
       width: 100%;
-      border-radius: 12px;
+      border-radius: 16px;
       z-index: 1;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    @media (min-width: 768px) {
+      #map {
+        height: 420px;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      #map {
+        height: 500px;
+      }
     }
 
     .bus-icon-active {
       font-size: 28px;
-      color: #2563eb;
-      text-shadow: 0 0 5px white;
+      color: #3b82f6;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
     }
 
     .bus-icon-inactive {
       font-size: 28px;
-      color: #9ca3af;
-      text-shadow: 0 0 5px white;
+      color: #cbd5e1;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
     }
 
     .bus-icon-emergency {
       font-size: 30px;
-      color: #dc2626;
-      text-shadow: 0 0 5px white;
+      color: #ef4444;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.95);
+      filter: drop-shadow(0 2px 4px rgba(239, 68, 68, 0.3));
     }
 
     .passenger-icon {
       font-size: 26px;
       color: #f97316;
-      text-shadow: 0 0 5px white;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
     }
 
     .pulse {
@@ -61,70 +84,111 @@
 
     @keyframes pulse {
       0% { opacity: 1; }
-      50% { opacity: 0.55; }
+      50% { opacity: 0.6; }
       100% { opacity: 1; }
+    }
+
+    /* Smooth transitions */
+    button {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Card hover effects */
+    .stat-card {
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Button focus states for accessibility */
+    button:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+
+    /* Status badge animation */
+    .status-connected {
+      background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+      border-left: 4px solid #3b82f6;
+    }
+
+    .status-error {
+      background: linear-gradient(135deg, #fee2e2, #fecaca);
+      border-left: 4px solid #ef4444;
     }
   </style>
 </head>
 
-<body class="p-4 md:p-8">
+<body class="p-3 md:p-6 lg:p-8">
 
-  <div class="max-w-6xl mx-auto">
+  <div class="max-w-7xl mx-auto">
 
     <!-- Header -->
-    <header class="bg-white p-6 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center border-b-4 border-blue-500">
-      <div>
-        <h1 class="text-2xl font-black text-gray-800">
-          خريطة المراقبة الحية للأسطول
-        </h1>
-        <p class="text-xs text-gray-400 mt-1">
-          Raspberry Pi → AWS IoT → DynamoDB → Lambda API → Vercel
-        </p>
-      </div>
+    <header class="bg-white rounded-2xl shadow-sm mb-6 overflow-hidden border-t-4 border-blue-500">
+      <div class="px-4 md:px-8 py-5 md:py-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+          <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+              خريطة المراقبة الحية
+            </h1>
+            <p class="text-xs md:text-sm text-gray-500 mt-2">
+              Raspberry Pi → AWS IoT → DynamoDB → Lambda API
+            </p>
+          </div>
 
-      <div class="text-left">
-        <span id="connection-status-badge" class="bg-gray-100 text-gray-500 px-4 py-2 rounded-full text-xs font-bold">
-          <i class="fa-solid fa-spinner fa-spin ml-1"></i>
-          بانتظار الاتصال بـ AWS...
-        </span>
+          <div class="flex-shrink-0">
+            <span id="connection-status-badge" class="inline-flex items-center gap-2 bg-gray-50 text-gray-600 px-4 py-2 rounded-full text-xs font-semibold border border-gray-200 whitespace-nowrap">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              <span>بانتظار الاتصال</span>
+            </span>
+          </div>
+        </div>
       </div>
     </header>
 
-    <!-- Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
 
-      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-blue-500">
-        <p class="text-gray-400 text-xs mb-1">الباص المحدد حالياً</p>
-        <p id="bus-code-val" class="text-lg font-bold text-gray-700">
-          بانتظار باص...
+      <!-- Selected Bus -->
+      <div class="stat-card bg-white p-4 md:p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100">
+        <p class="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">الباص المحدد</p>
+        <p id="bus-code-val" class="text-lg md:text-xl font-bold text-gray-900">
+          بانتظار...
         </p>
       </div>
 
-      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-orange-500 text-center">
-        <p class="text-gray-400 text-xs mb-1">حمولة الباص</p>
-        <p class="text-3xl font-black text-orange-600">
-          <span id="passengers-val">0</span>
-          <span class="text-lg">راكب</span>
-        </p>
+      <!-- Passengers -->
+      <div class="stat-card bg-white p-4 md:p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100">
+        <p class="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">الحمولة</p>
+        <div class="flex items-baseline gap-1">
+          <span id="passengers-val" class="text-2xl md:text-3xl font-bold text-orange-600">0</span>
+          <span class="text-xs text-gray-600">راكب</span>
+        </div>
       </div>
 
-      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-green-500">
-        <p class="text-gray-400 text-xs mb-1">آخر تحديث من الجهاز</p>
-        <p id="last-update" class="text-sm font-bold text-gray-700">
+      <!-- Last Update -->
+      <div class="stat-card bg-white p-4 md:p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100">
+        <p class="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">آخر تحديث</p>
+        <p id="last-update" class="text-sm font-semibold text-gray-700">
           غير متصل
         </p>
       </div>
 
-      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-purple-500">
-        <p class="text-gray-400 text-xs mb-1">حالة الطوارئ</p>
+      <!-- Emergency Status -->
+      <div class="stat-card bg-white p-4 md:p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100">
+        <p class="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">الحالة</p>
         <p id="emergency-val" class="text-sm font-bold text-green-600">
           طبيعي
         </p>
       </div>
 
-      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-gray-500">
-        <p class="text-gray-400 text-xs mb-1">عدد الباصات</p>
-        <p class="text-3xl font-black text-gray-700">
+      <!-- Fleet Count -->
+      <div class="stat-card bg-white p-4 md:p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100">
+        <p class="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">عدد الباصات</p>
+        <p class="text-2xl md:text-3xl font-bold text-blue-600">
           <span id="fleet-count">0</span>
         </p>
       </div>
@@ -132,63 +196,74 @@
     </div>
 
     <!-- Main Panel -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
-      <div class="flex flex-wrap justify-center gap-3 mb-6">
+      <div class="px-4 md:px-8 py-6 border-b border-gray-100">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
 
-        <button
-          id="request-btn"
-          onclick="togglePickupRequest()"
-          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition opacity-50 cursor-not-allowed"
-          disabled
-        >
-          <i class="fa-solid fa-hand-wave mr-2"></i>
-          حدد باصاً لطلب الركوب
-        </button>
+          <button
+            id="request-btn"
+            onclick="togglePickupRequest()"
+            class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base"
+            disabled
+          >
+            <i class="fa-solid fa-hand-wave"></i>
+            <span class="hidden sm:inline">اطلب ركوب</span>
+            <span class="sm:hidden">طلب</span>
+          </button>
 
-        <button
-          id="track-btn"
-          onclick="focusOnSelectedBus()"
-          class="bg-gray-800 hover:bg-black text-white font-bold py-3 px-8 rounded-full shadow-md transition"
-        >
-          <i class="fa-solid fa-crosshairs mr-2"></i>
-          تتبع الباص المحدد
-        </button>
+          <button
+            id="track-btn"
+            onclick="focusOnSelectedBus()"
+            class="w-full bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base"
+          >
+            <i class="fa-solid fa-crosshairs"></i>
+            <span class="hidden sm:inline">تتبع</span>
+            <span class="sm:hidden">تتبع</span>
+          </button>
 
-        <button
-          id="next-btn"
-          onclick="cycleNextBus()"
-          class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition"
-        >
-          <i class="fa-solid fa-rotate mr-2"></i>
-          الباص التالي
-        </button>
+          <button
+            id="next-btn"
+            onclick="cycleNextBus()"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base"
+          >
+            <i class="fa-solid fa-rotate"></i>
+            <span class="hidden sm:inline">الباص التالي</span>
+            <span class="sm:hidden">التالي</span>
+          </button>
 
-        <button
-          id="dist-btn"
-          onclick="toggleDistanceLine()"
-          class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition hidden"
-        >
-          <i class="fa-solid fa-route mr-2"></i>
-          كم يبعد هذا الباص عني؟
-        </button>
+          <button
+            id="dist-btn"
+            onclick="toggleDistanceLine()"
+            class="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base hidden"
+          >
+            <i class="fa-solid fa-route"></i>
+            <span class="hidden sm:inline">المسافة</span>
+            <span class="sm:hidden">كم</span>
+          </button>
 
+        </div>
       </div>
 
-      <p id="pickup-status" class="text-xs text-center text-gray-500 mb-2 h-4"></p>
+      <p id="pickup-status" class="text-xs md:text-sm text-center text-gray-500 px-4 md:px-8 py-3 h-auto min-h-4"></p>
 
-      <div id="map" class="border border-gray-100 shadow-inner"></div>
+      <div id="map" class="border-t border-gray-100 shadow-inner"></div>
 
-      <div class="mt-4 flex flex-wrap justify-center gap-3 text-xs">
-        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold">
-          <i class="fa-solid fa-bus"></i> نشط
-        </span>
-        <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">
-          <i class="fa-solid fa-bus"></i> متوقف
-        </span>
-        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
-          <i class="fa-solid fa-triangle-exclamation"></i> طوارئ
-        </span>
+      <div class="px-4 md:px-8 py-4 border-t border-gray-100 bg-gray-50">
+        <div class="flex flex-wrap justify-center gap-2 md:gap-3">
+          <span class="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-medium text-xs border border-blue-200">
+            <i class="fa-solid fa-bus"></i>
+            <span>نشط</span>
+          </span>
+          <span class="inline-flex items-center gap-2 bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg font-medium text-xs border border-slate-200">
+            <i class="fa-solid fa-bus"></i>
+            <span>متوقف</span>
+          </span>
+          <span class="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-lg font-medium text-xs border border-red-200">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>طوارئ</span>
+          </span>
+        </div>
       </div>
 
     </div>
@@ -289,14 +364,14 @@
 
     function setStatusConnected() {
       const badge = document.getElementById("connection-status-badge");
-      badge.innerHTML = '<i class="fa-solid fa-circle text-[8px] ml-1"></i> متصل بـ AWS';
-      badge.className = "bg-green-100 text-green-700 px-4 py-2 rounded-full text-xs font-bold pulse";
+      badge.innerHTML = '<i class="fa-solid fa-circle text-xs ml-1"></i> متصل بـ AWS';
+      badge.className = "status-connected inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-xs font-semibold border border-blue-200 whitespace-nowrap pulse";
     }
 
     function setStatusError(message) {
       const badge = document.getElementById("connection-status-badge");
       badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation ml-1"></i> ${message}`;
-      badge.className = "bg-red-100 text-red-700 px-4 py-2 rounded-full text-xs font-bold";
+      badge.className = "status-error inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-full text-xs font-semibold border border-red-200 whitespace-nowrap";
     }
 
     function formatTimestamp(timestamp) {
@@ -369,7 +444,10 @@
       }
 
       showLine = false;
-      document.getElementById("dist-btn").classList.add("hidden");
+      const distBtn = document.getElementById("dist-btn");
+      if (distBtn) {
+        distBtn.classList.add("hidden");
+      }
       updateRequestButtonUI(false);
     }
 
@@ -380,23 +458,21 @@
       const reqBtn = document.getElementById("request-btn");
 
       if (requested) {
-        reqBtn.innerHTML = '<i class="fa-solid fa-xmark mr-2"></i> إلغاء طلبي';
-        reqBtn.className = "bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+        reqBtn.innerHTML = '<i class="fa-solid fa-xmark"></i> <span class="hidden sm:inline">إلغاء الطلب</span> <span class="sm:hidden">إلغاء</span>';
+        reqBtn.className = "w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base";
         reqBtn.disabled = false;
         document.getElementById("dist-btn").classList.remove("hidden");
         return;
       }
 
-      reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> أنا هنا! أريد ركوب هذا الباص';
-      reqBtn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
-
       if (selectedBusId && fleet[selectedBusId] && fleet[selectedBusId].active) {
+        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave"></i> <span class="hidden sm:inline">اطلب ركوب</span> <span class="sm:hidden">طلب</span>';
+        reqBtn.className = "w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base";
         reqBtn.disabled = false;
-        reqBtn.classList.remove("opacity-50", "cursor-not-allowed");
       } else {
+        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave"></i> <span class="hidden sm:inline">اختر باصاً</span> <span class="sm:hidden">اختر</span>';
+        reqBtn.className = "w-full bg-slate-400 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base opacity-50 cursor-not-allowed";
         reqBtn.disabled = true;
-        reqBtn.classList.add("opacity-50", "cursor-not-allowed");
-        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> حدد باصاً نشطاً لطلب الركوب';
       }
     }
 
@@ -589,8 +665,8 @@
 
         clearSessionUI();
 
-        statusLabel.innerText = "تم إلغاء طلب الركوب وإخفاء موقعك.";
-        statusLabel.className = "text-xs text-gray-500 font-bold text-center mb-2";
+        statusLabel.innerText = "✓ تم إلغاء طلب الركوب";
+        statusLabel.className = "text-xs md:text-sm text-center text-gray-600 px-4 md:px-8 py-3 font-medium";
 
         setTimeout(() => {
           if (!isRequested) statusLabel.innerText = "";
@@ -604,8 +680,8 @@
         return;
       }
 
-      statusLabel.innerText = "جاري تحديد موقعك...";
-      statusLabel.className = "text-xs text-blue-500 mt-2 font-bold pulse text-center";
+      statusLabel.innerText = "⏳ جاري تحديد موقعك...";
+      statusLabel.className = "text-xs md:text-sm text-center text-blue-600 px-4 md:px-8 py-3 font-medium pulse";
 
       if (!navigator.geolocation) {
         alert("متصفحك لا يدعم تحديد الموقع.");
@@ -649,13 +725,13 @@
             throw new Error(`Request API Error: ${res.status}`);
           }
 
-          statusLabel.innerText = `✅ تم إرسال موقعك لباص (${myTargetBusId})!`;
-          statusLabel.className = "text-xs text-green-600 font-bold text-center mb-2";
+          statusLabel.innerText = `✓ تم إرسال موقعك للباص (${myTargetBusId})`;
+          statusLabel.className = "text-xs md:text-sm text-center text-green-600 px-4 md:px-8 py-3 font-medium";
 
         } catch (err) {
           console.log("Request API error:", err);
-          statusLabel.innerText = "⚠️ حدث خطأ أثناء إرسال الطلب.";
-          statusLabel.className = "text-xs text-red-600 font-bold text-center mb-2";
+          statusLabel.innerText = "⚠ حدث خطأ أثناء إرسال الطلب";
+          statusLabel.className = "text-xs md:text-sm text-center text-red-600 px-4 md:px-8 py-3 font-medium";
         }
 
         isRequested = true;
@@ -689,16 +765,16 @@
 
       if (showLine) {
         updateDistanceUI();
-        btn.innerHTML = '<i class="fa-solid fa-eye-slash mr-2"></i> إخفاء الخط';
-        btn.className = "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+        btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> <span class="hidden sm:inline">إخفاء</span> <span class="sm:hidden">خفي</span>';
+        btn.className = "w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base";
       } else {
         if (distanceLine) {
           map.removeLayer(distanceLine);
           distanceLine = null;
         }
 
-        btn.innerHTML = '<i class="fa-solid fa-route mr-2"></i> كم يبعد هذا الباص عني؟';
-        btn.className = "bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+        btn.innerHTML = '<i class="fa-solid fa-route"></i> <span class="hidden sm:inline">المسافة</span> <span class="sm:hidden">كم</span>';
+        btn.className = "w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2.5 md:py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm md:text-base";
       }
     }
 
@@ -719,24 +795,25 @@
       }
 
       distanceLine = L.polyline([userLocation, busLatLng], {
-        color: "#2563eb",
-        weight: 4,
-        opacity: 0.8,
-        dashArray: "10, 10",
-        lineJoin: "round"
+        color: "#3b82f6",
+        weight: 3,
+        opacity: 0.7,
+        dashArray: "8, 6",
+        lineJoin: "round",
+        lineCap: "round"
       }).addTo(map);
 
       distanceLine.bindTooltip(`
-        <div class="text-center border-r-4 border-blue-500 pr-2">
-          <div class="text-gray-500 text-[10px]">المسافة عن الباص ${selectedBusId}:</div>
-          <b class="text-blue-600">${km} كم</b><br>
-          <span class="text-gray-500 text-[10px]">يصل خلال:</span>
-          <b class="text-green-600">~${timeMins} دقيقة</b>
+        <div class="text-right">
+          <div class="text-xs text-gray-600 mb-1">المسافة عن الباص ${selectedBusId}:</div>
+          <div class="font-bold text-blue-600 text-sm mb-2">${km} كم</div>
+          <div class="text-xs text-gray-600">الوقت المتوقع:</div>
+          <div class="font-bold text-green-600 text-sm">~${timeMins} دقيقة</div>
         </div>
       `, {
         permanent: true,
         direction: "center",
-        className: "bg-white p-2 rounded-lg shadow-lg text-xs"
+        className: "bg-white rounded-lg shadow-lg border border-gray-100 p-2 text-xs"
       }).openTooltip();
     }
 
