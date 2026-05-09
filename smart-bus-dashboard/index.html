@@ -9,716 +9,188 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <script src="https://cdn.tailwindcss.com"></script>
+
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
   />
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap');
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --primary: #0066ff;
-      --primary-light: #3385ff;
-      --primary-dark: #0052cc;
-      --accent: #ff6b35;
-      --accent-light: #ff8555;
-      --success: #00d084;
-      --warning: #ffa500;
-      --danger: #ff3838;
-      --dark: #1a1a2e;
-      --light: #f8f9fa;
-      --border: rgba(0, 0, 0, 0.08);
-      --text-secondary: #6b7280;
-      --transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      --glow-sm: 0 2px 8px rgba(0, 102, 255, 0.12);
-      --glow-md: 0 8px 24px rgba(0, 102, 255, 0.2);
-      --glow-lg: 0 12px 48px rgba(0, 102, 255, 0.25);
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
 
     body {
-      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0f0f23 100%);
-      color: var(--dark);
-      line-height: 1.6;
-      min-height: 100vh;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle at 20% 50%, rgba(0, 102, 255, 0.1) 0%, transparent 50%),
-                  radial-gradient(circle at 80% 80%, rgba(255, 107, 53, 0.1) 0%, transparent 50%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    @media (min-width: 768px) {
-      .container {
-        padding: 3rem 2rem;
-      }
-    }
-
-    /* Header */
-    header {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      padding: 2rem;
-      margin-bottom: 2.5rem;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(0, 102, 255, 0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      animation: slideDown 0.6s ease-out;
-    }
-
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (min-width: 768px) {
-      header {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        padding: 2.5rem 2.5rem;
-      }
-    }
-
-    header h1 {
-      font-size: 2.5rem;
-      font-weight: 900;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -1px;
-      line-height: 1.1;
-    }
-
-    @media (max-width: 640px) {
-      header h1 {
-        font-size: 1.75rem;
-      }
-    }
-
-    header p {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      font-weight: 500;
-      letter-spacing: 1px;
-      margin-top: 0.5rem;
-    }
-
-    #connection-status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1.5rem;
-      background: rgba(0, 208, 132, 0.1);
-      border: 1.5px solid var(--success);
-      border-radius: 50px;
-      font-size: 0.875rem;
-      font-weight: 700;
-      color: var(--success);
-      white-space: nowrap;
-      backdrop-filter: blur(10px);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
-      animation: fadeInUp 0.7s ease-out 0.2s both;
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (min-width: 640px) {
-      .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (min-width: 768px) {
-      .stats-grid {
-        grid-template-columns: repeat(5, 1fr);
-      }
-    }
-
-    .stat-card {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(15px);
-      padding: 1.75rem;
-      border-radius: 18px;
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      transition: var(--transition);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 4px;
-      background: linear-gradient(90deg, var(--primary), var(--accent));
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-8px);
-      box-shadow: 0 12px 40px rgba(0, 102, 255, 0.2);
-      border-color: rgba(0, 102, 255, 0.4);
-    }
-
-    .stat-card:hover::before {
-      opacity: 1;
-    }
-
-    .stat-card.primary { --card-color: var(--primary); }
-    .stat-card.warning { --card-color: var(--warning); }
-    .stat-card.success { --card-color: var(--success); }
-    .stat-card.danger { --card-color: var(--danger); }
-
-    .stat-card__label {
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-    }
-
-    .stat-card__value {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--dark);
-      background: linear-gradient(135deg, var(--dark) 0%, var(--text-secondary) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-card__large {
-      font-size: 2.5rem;
-      font-weight: 900;
-    }
-
-    .stat-card__unit {
-      font-size: 0.9rem;
-      margin-left: 0.5rem;
-      font-weight: 600;
-    }
-
-    .main-panel {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      padding: 2.5rem;
-      border-radius: 24px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(0, 102, 255, 0.15);
-      animation: fadeInUp 0.7s ease-out 0.3s both;
-    }
-
-    @media (max-width: 768px) {
-      .main-panel {
-        padding: 1.75rem;
-      }
-    }
-
-    .button-group {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    button {
-      padding: 0.95rem 2rem;
-      border: none;
-      border-radius: 50px;
       font-family: 'Tajawal', sans-serif;
-      font-weight: 700;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: var(--transition);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.7rem;
-      white-space: nowrap;
-      position: relative;
-      overflow: hidden;
-      text-transform: capitalize;
-      letter-spacing: 0.5px;
-    }
-
-    button::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
-      transform: translate(-50%, -50%);
-      transition: width 0.6s, height 0.6s;
-      z-index: -1;
-    }
-
-    button:active {
-      transform: scale(0.95);
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-      color: white;
-      box-shadow: var(--glow-sm);
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      box-shadow: var(--glow-lg);
-      transform: translateY(-2px);
-    }
-
-    .btn-danger {
-      background: linear-gradient(135deg, var(--danger) 0%, #ff5555 100%);
-      color: white;
-      box-shadow: 0 4px 16px rgba(255, 56, 56, 0.3);
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      box-shadow: 0 8px 32px rgba(255, 56, 56, 0.4);
-      transform: translateY(-2px);
-    }
-
-    .btn-dark {
-      background: linear-gradient(135deg, var(--dark) 0%, #2d2d4e 100%);
-      color: white;
-      box-shadow: 0 4px 16px rgba(26, 26, 46, 0.3);
-    }
-
-    .btn-dark:hover:not(:disabled) {
-      box-shadow: 0 8px 32px rgba(26, 26, 46, 0.4);
-      transform: translateY(-2px);
-    }
-
-    .btn-success {
-      background: linear-gradient(135deg, var(--success) 0%, #00e899 100%);
-      color: white;
-      box-shadow: 0 4px 16px rgba(0, 208, 132, 0.3);
-    }
-
-    .btn-success:hover:not(:disabled) {
-      box-shadow: 0 8px 32px rgba(0, 208, 132, 0.4);
-      transform: translateY(-2px);
-    }
-
-    .btn-warning {
-      background: linear-gradient(135deg, var(--warning) 0%, #ffb84d 100%);
-      color: white;
-      box-shadow: 0 4px 16px rgba(255, 165, 0, 0.3);
-    }
-
-    .btn-warning:hover:not(:disabled) {
-      box-shadow: 0 8px 32px rgba(255, 165, 0, 0.4);
-      transform: translateY(-2px);
-    }
-
-    .btn-indigo {
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      color: white;
-      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
-    }
-
-    .btn-indigo:hover:not(:disabled) {
-      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
-      transform: translateY(-2px);
-    }
-
-    #pickup-status {
-      font-size: 0.95rem;
-      text-align: center;
-      margin-bottom: 1.5rem;
-      min-height: 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
+      background-color: #f3f4f6;
     }
 
     #map {
-      height: 500px;
+      height: 540px;
       width: 100%;
-      border-radius: 18px;
+      border-radius: 12px;
       z-index: 1;
-      border: 1px solid var(--border);
-      margin-bottom: 2rem;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-      overflow: hidden;
-    }
-
-    @media (min-width: 768px) {
-      #map {
-        height: 600px;
-      }
-    }
-
-    @media (max-width: 640px) {
-      #map {
-        height: 350px;
-      }
-    }
-
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 1.25rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--border);
-    }
-
-    .legend__item {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      padding: 0.75rem 1.25rem;
-      background: rgba(240, 240, 250, 0.9);
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      transition: var(--transition);
-      backdrop-filter: blur(10px);
-    }
-
-    .legend__item:hover {
-      background: rgba(0, 102, 255, 0.08);
-      border-color: var(--primary);
-    }
-
-    .legend__icon {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      font-size: 1rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .legend__active {
-      background: linear-gradient(135deg, rgba(0, 102, 255, 0.2), rgba(0, 102, 255, 0.1));
-      color: var(--primary);
-    }
-
-    .legend__inactive {
-      background: rgba(200, 200, 200, 0.2);
-      color: #999;
-    }
-
-    .legend__emergency {
-      background: linear-gradient(135deg, rgba(255, 56, 56, 0.2), rgba(255, 56, 56, 0.1));
-      color: var(--danger);
     }
 
     .bus-icon-active {
-      font-size: 32px;
-      color: var(--primary);
-      text-shadow: 0 0 8px rgba(0, 102, 255, 0.5);
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+      font-size: 28px;
+      color: #2563eb;
+      text-shadow: 0 0 5px white;
     }
 
     .bus-icon-inactive {
-      font-size: 32px;
-      color: #999;
-      text-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+      font-size: 28px;
+      color: #9ca3af;
+      text-shadow: 0 0 5px white;
     }
 
     .bus-icon-emergency {
-      font-size: 34px;
-      color: var(--danger);
-      text-shadow: 0 0 10px rgba(255, 56, 56, 0.6);
-      animation: danger-pulse 1s ease-in-out infinite;
-    }
-
-    @keyframes danger-pulse {
-      0%, 100% { text-shadow: 0 0 10px rgba(255, 56, 56, 0.6); }
-      50% { text-shadow: 0 0 20px rgba(255, 56, 56, 0.9); }
+      font-size: 30px;
+      color: #dc2626;
+      text-shadow: 0 0 5px white;
     }
 
     .passenger-icon {
-      font-size: 30px;
-      color: var(--accent);
-      text-shadow: 0 0 8px rgba(255, 107, 53, 0.5);
+      font-size: 26px;
+      color: #f97316;
+      text-shadow: 0 0 5px white;
     }
 
     .pulse {
-      animation: pulse-modern 2s ease-in-out infinite;
+      animation: pulse 2s infinite;
     }
 
-    @keyframes pulse-modern {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .text-success {
-      color: var(--success);
-    }
-
-    .text-danger {
-      color: var(--danger);
-    }
-
-    .text-warning {
-      color: var(--warning);
-    }
-
-    /* Mobile */
-    @media (max-width: 640px) {
-      .container {
-        padding: 1.5rem 1rem;
-      }
-
-      header {
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-      }
-
-      header h1 {
-        font-size: 1.5rem;
-      }
-
-      .stats-grid {
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .stat-card {
-        padding: 1.25rem;
-      }
-
-      .main-panel {
-        padding: 1.5rem;
-      }
-
-      .button-group {
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-      }
-
-      button {
-        padding: 0.75rem 1.25rem;
-        font-size: 0.85rem;
-      }
-
-      .button-group button i {
-        font-size: 0.9rem;
-      }
-    }
-
-    @media (max-width: 480px) {
-      header h1 {
-        font-size: 1.25rem;
-      }
-
-      header p {
-        font-size: 0.7rem;
-      }
-
-      .stat-card__large {
-        font-size: 2rem;
-      }
-
-      button {
-        padding: 0.65rem 1rem;
-        font-size: 0.8rem;
-      }
-
-      .legend {
-        gap: 0.75rem;
-      }
-
-      .legend__item {
-        padding: 0.5rem 0.9rem;
-        font-size: 0.8rem;
-      }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.55; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
 
-<body>
+<body class="p-4 md:p-8">
+
+  <div class="max-w-6xl mx-auto">
+
     <!-- Header -->
-    <header>
+    <header class="bg-white p-6 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center border-b-4 border-blue-500">
       <div>
-        <h1>خريطة المراقبة الحية للأسطول</h1>
-        <p>Raspberry Pi → AWS IoT → DynamoDB → Lambda API → Vercel</p>
+        <h1 class="text-2xl font-black text-gray-800">
+          خريطة المراقبة الحية للأسطول
+        </h1>
+        <p class="text-xs text-gray-400 mt-1">
+          Raspberry Pi → AWS IoT → DynamoDB → Lambda API → Vercel
+        </p>
       </div>
-      <div>
-        <span id="connection-status-badge">
-          <i class="fa-solid fa-spinner fa-spin"></i>
+
+      <div class="text-left">
+        <span id="connection-status-badge" class="bg-gray-100 text-gray-500 px-4 py-2 rounded-full text-xs font-bold">
+          <i class="fa-solid fa-spinner fa-spin ml-1"></i>
           بانتظار الاتصال بـ AWS...
         </span>
       </div>
     </header>
 
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-      <div class="stat-card primary">
-        <div class="stat-card__label">الباص المحدد حالياً</div>
-        <div class="stat-card__value" id="bus-code-val">بانتظار باص...</div>
+    <!-- Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-blue-500">
+        <p class="text-gray-400 text-xs mb-1">الباص المحدد حالياً</p>
+        <p id="bus-code-val" class="text-lg font-bold text-gray-700">
+          بانتظار باص...
+        </p>
       </div>
 
-      <div class="stat-card warning">
-        <div class="stat-card__label">حمولة الباص</div>
-        <div class="stat-card__value stat-card__large">
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-orange-500 text-center">
+        <p class="text-gray-400 text-xs mb-1">حمولة الباص</p>
+        <p class="text-3xl font-black text-orange-600">
           <span id="passengers-val">0</span>
-          <span class="stat-card__unit">راكب</span>
-        </div>
+          <span class="text-lg">راكب</span>
+        </p>
       </div>
 
-      <div class="stat-card success">
-        <div class="stat-card__label">آخر تحديث من الجهاز</div>
-        <div class="stat-card__value" id="last-update">غير متصل</div>
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-green-500">
+        <p class="text-gray-400 text-xs mb-1">آخر تحديث من الجهاز</p>
+        <p id="last-update" class="text-sm font-bold text-gray-700">
+          غير متصل
+        </p>
       </div>
 
-      <div class="stat-card danger">
-        <div class="stat-card__label">حالة الطوارئ</div>
-        <div class="stat-card__value stat-card__status text-success" id="emergency-val">طبيعي</div>
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-purple-500">
+        <p class="text-gray-400 text-xs mb-1">حالة الطوارئ</p>
+        <p id="emergency-val" class="text-sm font-bold text-green-600">
+          طبيعي
+        </p>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-card__label">عدد الباصات</div>
-        <div class="stat-card__value stat-card__large"><span id="fleet-count">0</span></div>
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-gray-500">
+        <p class="text-gray-400 text-xs mb-1">عدد الباصات</p>
+        <p class="text-3xl font-black text-gray-700">
+          <span id="fleet-count">0</span>
+        </p>
       </div>
+
     </div>
 
     <!-- Main Panel -->
-    <div class="main-panel">
-      <!-- Button Group -->
-      <div class="button-group">
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+
+      <div class="flex flex-wrap justify-center gap-3 mb-6">
+
         <button
           id="request-btn"
           onclick="togglePickupRequest()"
-          class="btn-primary"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition opacity-50 cursor-not-allowed"
           disabled
         >
-          <i class="fa-solid fa-hand-wave"></i>
+          <i class="fa-solid fa-hand-wave mr-2"></i>
           حدد باصاً لطلب الركوب
         </button>
 
         <button
           id="track-btn"
           onclick="focusOnSelectedBus()"
-          class="btn-dark"
+          class="bg-gray-800 hover:bg-black text-white font-bold py-3 px-8 rounded-full shadow-md transition"
         >
-          <i class="fa-solid fa-crosshairs"></i>
+          <i class="fa-solid fa-crosshairs mr-2"></i>
           تتبع الباص المحدد
         </button>
 
         <button
           id="next-btn"
           onclick="cycleNextBus()"
-          class="btn-indigo"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition"
         >
-          <i class="fa-solid fa-rotate"></i>
+          <i class="fa-solid fa-rotate mr-2"></i>
           الباص التالي
         </button>
 
         <button
           id="dist-btn"
           onclick="toggleDistanceLine()"
-          class="btn-success"
-          style="display: none;"
+          class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition hidden"
         >
-          <i class="fa-solid fa-route"></i>
+          <i class="fa-solid fa-route mr-2"></i>
           كم يبعد هذا الباص عني؟
         </button>
+
       </div>
 
-      <!-- Status Message -->
-      <p id="pickup-status"></p>
+      <p id="pickup-status" class="text-xs text-center text-gray-500 mb-2 h-4"></p>
 
-      <!-- Map -->
-      <div id="map"></div>
+      <div id="map" class="border border-gray-100 shadow-inner"></div>
 
-      <!-- Legend -->
-      <div class="legend">
-        <span class="legend__item">
-          <span class="legend__icon legend__active">
-            <i class="fa-solid fa-bus"></i>
-          </span>
-          نشط
+      <div class="mt-4 flex flex-wrap justify-center gap-3 text-xs">
+        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-bus"></i> نشط
         </span>
-        <span class="legend__item">
-          <span class="legend__icon legend__inactive">
-            <i class="fa-solid fa-bus"></i>
-          </span>
-          متوقف
+        <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-bus"></i> متوقف
         </span>
-        <span class="legend__item">
-          <span class="legend__icon legend__emergency">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </span>
-          طوارئ
+        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-triangle-exclamation"></i> طوارئ
         </span>
       </div>
+
     </div>
 
   </div>
