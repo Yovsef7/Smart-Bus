@@ -1,324 +1,659 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Smart Bus Live Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>خريطة المراقبة الحية - Smart Bus AWS</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <link
     rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
   />
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
 
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0b0f14;
-      color: white;
-    }
-
-    header {
-      padding: 20px 30px;
-      background: #111827;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #263244;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 28px;
-    }
-
-    .status {
-      color: #00ff88;
-      font-weight: bold;
-    }
-
-    .container {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 20px;
-      padding: 20px;
-      height: calc(100vh - 80px);
-    }
-
-    .panel {
-      background: #111827;
-      border-radius: 18px;
-      padding: 20px;
-      box-shadow: 0 0 25px rgba(0,0,0,0.45);
-      border: 1px solid #253044;
-    }
-
-    .card {
-      background: #1f2937;
-      padding: 18px;
-      border-radius: 15px;
-      margin-bottom: 15px;
-    }
-
-    .card h2 {
-      margin-top: 0;
-    }
-
-    .label {
-      color: #b7c0cc;
-      margin: 12px 0;
-    }
-
-    .value {
-      color: #00ff88;
-      font-weight: bold;
-    }
-
-    .danger {
-      color: #ff4d4d;
-      font-weight: bold;
-    }
-
-    .warning {
-      color: #ffd166;
-      font-weight: bold;
-    }
-
-    .progress {
-      width: 100%;
-      height: 14px;
-      background: #374151;
-      border-radius: 20px;
-      overflow: hidden;
-      margin-top: 8px;
-    }
-
-    .bar {
-      height: 100%;
-      width: 0%;
-      background: #00ff88;
-      transition: 0.4s;
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f3f4f6;
     }
 
     #map {
+      height: 520px;
       width: 100%;
-      height: 100%;
-      border-radius: 18px;
-      border: 1px solid #253044;
+      border-radius: 12px;
+      z-index: 1;
     }
 
-    .badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: #0f766e;
-      margin-top: 8px;
-      font-size: 14px;
+    .bus-icon {
+      font-size: 28px;
+      color: #2563eb;
+      text-shadow: 0 0 5px white;
     }
 
-    .footer {
-      font-size: 13px;
-      color: #8b95a5;
-      margin-top: 20px;
+    .passenger-icon {
+      font-size: 26px;
+      color: #f97316;
+      text-shadow: 0 0 5px white;
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.55; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
 
-<body>
+<body class="p-4 md:p-8">
 
-<header>
-  <h1>🚌 Smart Bus Tracking Dashboard</h1>
-  <div>System Status: <span class="status">LIVE</span></div>
-</header>
+  <div class="max-w-6xl mx-auto">
 
-<div class="container">
-
-  <div class="panel">
-    <div class="card">
-      <h2>Bus Information</h2>
-
-      <p class="label">Bus ID: <span id="busId" class="value">--</span></p>
-      <p class="label">Latitude: <span id="lat" class="value">--</span></p>
-      <p class="label">Longitude: <span id="lon" class="value">--</span></p>
-      <p class="label">Last Update: <span id="lastUpdate" class="value">--</span></p>
-
-      <span class="badge">Raspberry Pi Active</span>
-    </div>
-
-    <div class="card">
-      <h2>Occupancy</h2>
-
-      <p class="label">
-        Passengers:
-        <span id="occ" class="value">--</span>
-      </p>
-
-      <div class="progress">
-        <div id="occBar" class="bar"></div>
+    <!-- Header -->
+    <header class="bg-white p-6 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center border-b-4 border-blue-500">
+      <div>
+        <h1 class="text-2xl font-black text-gray-800">
+          خريطة المراقبة الحية للأسطول
+        </h1>
+        <p class="text-xs text-gray-400 mt-1">
+          Raspberry Pi → AWS IoT → DynamoDB → Lambda API → Vercel
+        </p>
       </div>
 
-      <p class="label">
-        Status:
-        <span id="occStatus" class="value">--</span>
-      </p>
+      <div class="text-left">
+        <span id="connection-status-badge" class="bg-gray-100 text-gray-500 px-4 py-2 rounded-full text-xs font-bold">
+          <i class="fa-solid fa-spinner fa-spin ml-1"></i>
+          بانتظار الاتصال بـ AWS...
+        </span>
+      </div>
+    </header>
+
+    <!-- Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-blue-500">
+        <p class="text-gray-400 text-xs mb-1">الباص المحدد حالياً</p>
+        <p id="bus-code-val" class="text-lg font-bold text-gray-700">
+          بانتظار باص...
+        </p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-orange-500 text-center">
+        <p class="text-gray-400 text-xs mb-1">حمولة الباص</p>
+        <p class="text-3xl font-black text-orange-600">
+          <span id="passengers-val">0</span>
+          <span class="text-lg">راكب</span>
+        </p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-green-500">
+        <p class="text-gray-400 text-xs mb-1">آخر تحديث من الجهاز</p>
+        <p id="last-update" class="text-sm font-bold text-gray-700">
+          غير متصل
+        </p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-purple-500">
+        <p class="text-gray-400 text-xs mb-1">حالة الطوارئ</p>
+        <p id="emergency-val" class="text-sm font-bold text-green-600">
+          طبيعي
+        </p>
+      </div>
+
     </div>
 
-    <div class="card">
-      <h2>ETA</h2>
+    <!-- Main Panel -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
 
-      <p class="label">
-        Estimated Arrival:
-        <span id="eta" class="value">--</span>
-      </p>
+      <div class="flex flex-wrap justify-center gap-3 mb-6">
 
-      <p class="label">
-        Next Stop:
-        <span class="value">Alamein Central Stop</span>
-      </p>
+        <button
+          id="request-btn"
+          onclick="togglePickupRequest()"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition opacity-50 cursor-not-allowed"
+          disabled
+        >
+          <i class="fa-solid fa-hand-wave mr-2"></i>
+          حدد باصاً لطلب الركوب
+        </button>
+
+        <button
+          id="track-btn"
+          onclick="focusOnSelectedBus()"
+          class="bg-gray-800 hover:bg-black text-white font-bold py-3 px-8 rounded-full shadow-md transition"
+        >
+          <i class="fa-solid fa-crosshairs mr-2"></i>
+          تتبع الباص
+        </button>
+
+        <button
+          id="dist-btn"
+          onclick="toggleDistanceLine()"
+          class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition hidden"
+        >
+          <i class="fa-solid fa-route mr-2"></i>
+          كم يبعد هذا الباص عني؟
+        </button>
+
+      </div>
+
+      <p id="pickup-status" class="text-xs text-center text-gray-500 mb-2 h-4"></p>
+
+      <div id="map" class="border border-gray-100 shadow-inner"></div>
+
     </div>
 
-    <div class="card">
-      <h2>Emergency</h2>
-      <p class="label">
-        Emergency Status:
-        <span id="emergency" class="value">Normal</span>
-      </p>
-    </div>
-
-    <div class="footer">
-      Data Source: Raspberry Pi → MQTT → Node.js Backend → Dashboard
-    </div>
   </div>
 
-  <div id="map"></div>
+  <script>
+    // ======================================================
+    // AWS API Gateway URL
+    // ======================================================
+    const API_BASE = "https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/prod";
 
-</div>
+    // لو Route الطلب مش جاهز، الصفحة هتفضل تعرض الباص عادي.
+    const BUS_API = `${API_BASE}/bus`;
+    const REQUEST_API = `${API_BASE}/request`;
+    const REMOVE_REQUEST_API = `${API_BASE}/request/remove`;
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    // ======================================================
+    // Map Setup
+    // ======================================================
+    const DEFAULT_LAT = 30.1234;
+    const DEFAULT_LNG = 28.9876;
 
-<script>
-  const map = L.map("map").setView([30.1234, 28.9876], 15);
+    let map = L.map("map").setView([DEFAULT_LAT, DEFAULT_LNG], 14);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
-  }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap"
+    }).addTo(map);
 
-  const busIcon = L.divIcon({
-    html: "🚌",
-    className: "",
-    iconSize: [35, 35],
-    iconAnchor: [17, 17]
-  });
+    const busIcon = L.divIcon({
+      html: '<i class="fa-solid fa-bus bus-icon"></i>',
+      className: "custom-div-icon",
+      iconSize: [35, 35],
+      iconAnchor: [17, 17]
+    });
 
-  let busMarker = L.marker([30.1234, 28.9876], {
-    icon: busIcon
-  }).addTo(map);
+    const passengerIcon = L.divIcon({
+      html: '<i class="fa-solid fa-person-walking passenger-icon"></i>',
+      className: "custom-div-icon",
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
 
-  busMarker.bindPopup("Bus 1");
+    // ======================================================
+    // State
+    // ======================================================
+    let fleet = {};
+    let selectedBusId = null;
 
-  const stopLat = 30.1255;
-  const stopLon = 28.9905;
+    let busMarker = null;
+    let passengerMarker = null;
+    let distanceLine = null;
 
-  L.marker([stopLat, stopLon]).addTo(map)
-    .bindPopup("Alamein Central Stop");
+    let userLocation = null;
+    let showLine = false;
+    let isRequested = false;
+    let myPassengerId = null;
+    let myTargetBusId = null;
 
-  function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
+    // ======================================================
+    // Helpers
+    // ======================================================
+    function normalizeBusData(data) {
+      const busNumber = data.bus_id ?? 1;
+      const busCode = data.bus_code || `BUS-0${busNumber}`;
 
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+      const lat = Number(data.lat ?? data.latitude);
+      const lng = Number(data.lng ?? data.longitude);
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
+      const passengers = Number(data.passengers ?? data.occupancy ?? 0);
+      const maxCapacity = Number(data.max_capacity ?? 30);
 
-  function updateOccupancyColor(percent) {
-    const bar = document.getElementById("occBar");
-    const status = document.getElementById("occStatus");
-
-    bar.style.width = percent + "%";
-
-    if (percent < 60) {
-      bar.style.background = "#00ff88";
-      status.textContent = "Available";
-      status.className = "value";
-    } else if (percent < 90) {
-      bar.style.background = "#ffd166";
-      status.textContent = "Near Full";
-      status.className = "warning";
-    } else {
-      bar.style.background = "#ff4d4d";
-      status.textContent = "Full / Crowded";
-      status.className = "danger";
+      return {
+        bus_id: busCode,
+        raw_bus_id: busNumber,
+        lat,
+        lng,
+        passengers,
+        max_capacity: maxCapacity,
+        active: data.active !== false,
+        timestamp: data.timestamp ?? null,
+        emergency: data.emergency === true,
+        eta: data.eta ?? null,
+        action: data.action ?? ""
+      };
     }
-  }
 
-  async function loadBusData() {
-    try {
-      const res = await fetch("https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/prod/bus");
-      const data = await res.json();
+    function setStatusConnected() {
+      const badge = document.getElementById("connection-status-badge");
+      badge.innerHTML = '<i class="fa-solid fa-circle text-[8px] ml-1"></i> متصل بـ AWS';
+      badge.className = "bg-green-100 text-green-700 px-4 py-2 rounded-full text-xs font-bold pulse";
+    }
 
-      if (!data || !data.bus_id) return;
+    function setStatusError(message) {
+      const badge = document.getElementById("connection-status-badge");
+      badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation ml-1"></i> ${message}`;
+      badge.className = "bg-red-100 text-red-700 px-4 py-2 rounded-full text-xs font-bold";
+    }
 
-      const lat = Number(data.latitude);
-      const lon = Number(data.longitude);
-      const occupancy = Number(data.occupancy);
-      const maxCapacity = Number(data.max_capacity);
+    function formatTimestamp(timestamp) {
+      if (!timestamp) return new Date().toLocaleTimeString("ar-EG");
 
-      document.getElementById("busId").textContent = data.bus_id;
-      document.getElementById("lat").textContent = lat.toFixed(6);
-      document.getElementById("lon").textContent = lon.toFixed(6);
-      document.getElementById("occ").textContent = occupancy + "/" + maxCapacity;
+      // Raspberry sends seconds, JS Date needs milliseconds.
+      const t = Number(timestamp);
+      const ms = t < 1000000000000 ? t * 1000 : t;
 
-      const now = new Date();
-      document.getElementById("lastUpdate").textContent =
-        now.toLocaleTimeString();
+      return new Date(ms).toLocaleString("ar-EG");
+    }
 
-      const percent = Math.round((occupancy / maxCapacity) * 100);
-      updateOccupancyColor(percent);
+    function isValidLocation(lat, lng) {
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }
 
-      busMarker.setLatLng([lat, lon]);
-      busMarker.setPopupContent(`
-        <b>Bus ${data.bus_id}</b><br>
-        Occupancy: ${occupancy}/${maxCapacity}<br>
-        GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}
-      `);
+    // ======================================================
+    // Session
+    // ======================================================
+    function loadSession() {
+      const savedId = localStorage.getItem("bus_passenger_id");
+      const targetBus = localStorage.getItem("bus_target_bus_id");
 
-      map.panTo([lat, lon]);
+      if (savedId && targetBus) {
+        myPassengerId = savedId;
+        myTargetBusId = targetBus;
 
-      const distanceKm = calculateDistance(lat, lon, stopLat, stopLon);
-      const speedKmH = 40;
-      const etaMinutes = Math.max(1, Math.round((distanceKm / speedKmH) * 60));
+        const lat = parseFloat(localStorage.getItem("bus_user_lat"));
+        const lng = parseFloat(localStorage.getItem("bus_user_lng"));
 
-      document.getElementById("eta").textContent =
-        etaMinutes + " min";
+        if (!isNaN(lat) && !isNaN(lng)) {
+          userLocation = L.latLng(lat, lng);
+          drawPassengerMarker(userLocation);
+        }
 
-      if (data.emergency === true) {
-        document.getElementById("emergency").textContent = "Emergency Active";
-        document.getElementById("emergency").className = "danger";
-      } else {
-        document.getElementById("emergency").textContent = "Normal";
-        document.getElementById("emergency").className = "value";
+        isRequested = true;
+        updateRequestButtonUI(true);
+      }
+    }
+
+    function saveSession() {
+      localStorage.setItem("bus_passenger_id", myPassengerId);
+      localStorage.setItem("bus_user_lat", userLocation.lat);
+      localStorage.setItem("bus_user_lng", userLocation.lng);
+      localStorage.setItem("bus_target_bus_id", myTargetBusId);
+    }
+
+    function clearSessionUI() {
+      localStorage.removeItem("bus_passenger_id");
+      localStorage.removeItem("bus_user_lat");
+      localStorage.removeItem("bus_user_lng");
+      localStorage.removeItem("bus_target_bus_id");
+
+      isRequested = false;
+      userLocation = null;
+      myPassengerId = null;
+      myTargetBusId = null;
+
+      if (passengerMarker) {
+        map.removeLayer(passengerMarker);
+        passengerMarker = null;
       }
 
-    } catch (error) {
-      console.log("Dashboard Error:", error);
-    }
-  }
+      if (distanceLine) {
+        map.removeLayer(distanceLine);
+        distanceLine = null;
+      }
 
-  loadBusData();
-  setInterval(loadBusData, 2000);
-</script>
+      showLine = false;
+      document.getElementById("dist-btn").classList.add("hidden");
+      updateRequestButtonUI(false);
+    }
+
+    // ======================================================
+    // UI Updates
+    // ======================================================
+    function updateRequestButtonUI(requested) {
+      const reqBtn = document.getElementById("request-btn");
+
+      if (requested) {
+        reqBtn.innerHTML = '<i class="fa-solid fa-xmark mr-2"></i> إلغاء طلبي';
+        reqBtn.className = "bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+        reqBtn.disabled = false;
+        document.getElementById("dist-btn").classList.remove("hidden");
+        return;
+      }
+
+      reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> أنا هنا! أريد ركوب هذا الباص';
+      reqBtn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+
+      if (selectedBusId && fleet[selectedBusId] && fleet[selectedBusId].active) {
+        reqBtn.disabled = false;
+        reqBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      } else {
+        reqBtn.disabled = true;
+        reqBtn.classList.add("opacity-50", "cursor-not-allowed");
+        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> حدد باصاً لطلب الركوب';
+      }
+    }
+
+    function updateCards(bus) {
+      document.getElementById("bus-code-val").innerText = bus.bus_id;
+      document.getElementById("passengers-val").innerText = bus.passengers;
+      document.getElementById("last-update").innerText = formatTimestamp(bus.timestamp);
+
+      const emergencyEl = document.getElementById("emergency-val");
+
+      if (bus.emergency) {
+        emergencyEl.innerText = "طوارئ نشطة";
+        emergencyEl.className = "text-sm font-bold text-red-600 pulse";
+      } else {
+        emergencyEl.innerText = "طبيعي";
+        emergencyEl.className = "text-sm font-bold text-green-600";
+      }
+    }
+
+    function drawBus(bus) {
+      if (!isValidLocation(bus.lat, bus.lng)) {
+        console.log("Invalid location:", bus);
+        return;
+      }
+
+      selectedBusId = bus.bus_id;
+      fleet[bus.bus_id] = bus;
+
+      if (!busMarker) {
+        busMarker = L.marker([bus.lat, bus.lng], {
+          icon: busIcon,
+          zIndexOffset: 1000
+        }).addTo(map);
+
+        busMarker.on("click", () => {
+          selectedBusId = bus.bus_id;
+          focusOnSelectedBus();
+        });
+      } else {
+        busMarker.setLatLng([bus.lat, bus.lng]);
+      }
+
+      busMarker.bindPopup(`
+        <div style="text-align:right">
+          <b>باص ${bus.bus_id}</b><br>
+          الركاب: ${bus.passengers}/${bus.max_capacity}<br>
+          الحالة: ${bus.active ? "نشط" : "متوقف"}<br>
+          ${bus.emergency ? "🚨 طوارئ" : "✅ طبيعي"}
+        </div>
+      `);
+
+      updateCards(bus);
+      updateRequestButtonUI(isRequested);
+
+      if (showLine) {
+        updateDistanceUI();
+      }
+    }
+
+    function drawPassengerMarker(latlng) {
+      if (!latlng) return;
+
+      if (!passengerMarker) {
+        passengerMarker = L.marker([latlng.lat, latlng.lng], {
+          icon: passengerIcon
+        }).addTo(map);
+      } else {
+        passengerMarker.setLatLng([latlng.lat, latlng.lng]);
+      }
+
+      passengerMarker.bindPopup("<b>موقعك الحالي</b><br>طلب ركوب نشط");
+    }
+
+    // ======================================================
+    // AWS Load Data
+    // ======================================================
+    async function loadBusFromAWS() {
+      try {
+        const res = await fetch(BUS_API);
+
+        if (!res.ok) {
+          throw new Error(`API Error: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log("AWS BUS DATA:", data);
+
+        const bus = normalizeBusData(data);
+
+        if (!isValidLocation(bus.lat, bus.lng)) {
+          setStatusError("GPS غير صالح");
+          return;
+        }
+
+        drawBus(bus);
+        setStatusConnected();
+
+      } catch (err) {
+        console.log("AWS API Error:", err);
+        setStatusError("خطأ في الاتصال بـ AWS");
+      }
+    }
+
+    // ======================================================
+    // Actions
+    // ======================================================
+    function focusOnSelectedBus() {
+      if (!selectedBusId || !fleet[selectedBusId]) {
+        alert("لا يوجد باص متاح حالياً.");
+        return;
+      }
+
+      const bus = fleet[selectedBusId];
+
+      if (!isValidLocation(bus.lat, bus.lng)) {
+        alert("موقع الباص غير متاح حالياً.");
+        return;
+      }
+
+      map.flyTo([bus.lat, bus.lng], 16, {
+        animate: true,
+        duration: 1.0
+      });
+
+      if (busMarker) {
+        busMarker.openPopup();
+      }
+    }
+
+    async function togglePickupRequest() {
+      const statusLabel = document.getElementById("pickup-status");
+
+      if (isRequested) {
+        try {
+          if (myPassengerId && myTargetBusId) {
+            await fetch(REMOVE_REQUEST_API, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                bus_id: myTargetBusId,
+                request_id: myPassengerId
+              })
+            });
+          }
+        } catch (err) {
+          console.log("Remove request API not ready:", err);
+        }
+
+        clearSessionUI();
+
+        statusLabel.innerText = "تم إلغاء طلب الركوب وإخفاء موقعك.";
+        statusLabel.className = "text-xs text-gray-500 font-bold text-center mb-2";
+
+        setTimeout(() => {
+          if (!isRequested) statusLabel.innerText = "";
+        }, 3000);
+
+        return;
+      }
+
+      if (!selectedBusId || !fleet[selectedBusId] || !fleet[selectedBusId].active) {
+        alert("يرجى تتبع باص نشط أولاً لطلب ركوبه.");
+        return;
+      }
+
+      statusLabel.innerText = "جاري تحديد موقعك...";
+      statusLabel.className = "text-xs text-blue-500 mt-2 font-bold pulse text-center";
+
+      if (!navigator.geolocation) {
+        alert("متصفحك لا يدعم تحديد الموقع.");
+        statusLabel.innerText = "";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        userLocation = L.latLng(position.coords.latitude, position.coords.longitude);
+
+        drawPassengerMarker(userLocation);
+
+        map.flyTo([userLocation.lat, userLocation.lng], 17, {
+          animate: true,
+          duration: 1.5
+        });
+
+        const timeStr = new Date().toLocaleTimeString("ar-EG");
+        myTargetBusId = selectedBusId;
+        myPassengerId = `${Date.now()}_${Math.round(userLocation.lat * 100000)}`;
+
+        const requestPayload = {
+          bus_id: myTargetBusId,
+          request_id: myPassengerId,
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          time: timeStr,
+          status: "waiting"
+        };
+
+        try {
+          const res = await fetch(REQUEST_API, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestPayload)
+          });
+
+          if (!res.ok) {
+            throw new Error(`Request API Error: ${res.status}`);
+          }
+
+          statusLabel.innerText = `✅ تم إرسال موقعك لباص (${myTargetBusId})!`;
+          statusLabel.className = "text-xs text-green-600 font-bold text-center mb-2";
+
+        } catch (err) {
+          console.log("Request API not ready:", err);
+          statusLabel.innerText = "⚠️ تم حفظ الطلب محلياً، لكن API الطلبات غير جاهز.";
+          statusLabel.className = "text-xs text-orange-600 font-bold text-center mb-2";
+        }
+
+        isRequested = true;
+        saveSession();
+        updateRequestButtonUI(true);
+
+        setTimeout(() => {
+          statusLabel.innerText = "";
+        }, 5000);
+
+      }, () => {
+        alert("يرجى تفعيل GPS لإرسال طلب الركوب.");
+        statusLabel.innerText = "";
+      });
+    }
+
+    function toggleDistanceLine() {
+      if (!userLocation) {
+        alert("لا يوجد موقع راكب. اضغط طلب ركوب أولاً.");
+        return;
+      }
+
+      if (!selectedBusId || !fleet[selectedBusId]) {
+        alert("لا يوجد باص محدد.");
+        return;
+      }
+
+      showLine = !showLine;
+
+      const btn = document.getElementById("dist-btn");
+
+      if (showLine) {
+        updateDistanceUI();
+        btn.innerHTML = '<i class="fa-solid fa-eye-slash mr-2"></i> إخفاء الخط';
+        btn.className = "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+      } else {
+        if (distanceLine) {
+          map.removeLayer(distanceLine);
+          distanceLine = null;
+        }
+
+        btn.innerHTML = '<i class="fa-solid fa-route mr-2"></i> كم يبعد هذا الباص عني؟';
+        btn.className = "bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition";
+      }
+    }
+
+    function updateDistanceUI() {
+      if (!showLine || !userLocation || !selectedBusId || !fleet[selectedBusId]) return;
+
+      const bus = fleet[selectedBusId];
+      const busLatLng = L.latLng(bus.lat, bus.lng);
+
+      const distance = userLocation.distanceTo(busLatLng);
+      const km = (distance / 1000).toFixed(2);
+
+      const speedMetersPerMin = 333;
+      const timeMins = Math.max(1, Math.round(distance / speedMetersPerMin));
+
+      if (distanceLine) {
+        map.removeLayer(distanceLine);
+      }
+
+      distanceLine = L.polyline([userLocation, busLatLng], {
+        color: "#2563eb",
+        weight: 4,
+        opacity: 0.8,
+        dashArray: "10, 10",
+        lineJoin: "round"
+      }).addTo(map);
+
+      distanceLine.bindTooltip(`
+        <div class="text-center border-r-4 border-blue-500 pr-2">
+          <div class="text-gray-500 text-[10px]">المسافة عن الباص:</div>
+          <b class="text-blue-600">${km} كم</b><br>
+          <span class="text-gray-500 text-[10px]">يصل خلال:</span>
+          <b class="text-green-600">~${timeMins} دقيقة</b>
+        </div>
+      `, {
+        permanent: true,
+        direction: "center",
+        className: "bg-white p-2 rounded-lg shadow-lg text-xs"
+      }).openTooltip();
+    }
+
+    // ======================================================
+    // Start
+    // ======================================================
+    loadSession();
+    loadBusFromAWS();
+    setInterval(loadBusFromAWS, 3000);
+  </script>
 
 </body>
 </html>
