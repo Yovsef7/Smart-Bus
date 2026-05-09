@@ -65,7 +65,7 @@
       </button>
 
       <p class="text-[11px] text-gray-400 mt-5 leading-6">
-        هذا التطبيق يعمل من خلال AWS API Gateway + Lambda + DynamoDB
+        يعمل من خلال AWS API Gateway + Lambda + DynamoDB
         <br />
         بدون HiveMQ وبدون Backend Server
       </p>
@@ -194,7 +194,7 @@
 
     const API_BASE = "https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/prod";
 
-    const BUS_API = `${API_BASE}/buses`;
+    const BUS_API = `${API_BASE}/bus`;
     const REQUESTS_API = `${API_BASE}/requests`;
     const REMOVE_REQUEST_API = `${API_BASE}/request/remove`;
     const DRIVER_CONTROL_API = `${API_BASE}/driver/control`;
@@ -213,6 +213,20 @@
     // Session
     // ======================================================
 
+    function normalizeBusCode(value) {
+      const raw = value.trim().toUpperCase();
+
+      if (!raw) return "";
+
+      const match = raw.match(/\d+/);
+
+      if (!match) return raw;
+
+      const n = Number(match[0]);
+
+      return `BUS-${String(n).padStart(2, "0")}`;
+    }
+
     function checkSession() {
       const savedId = localStorage.getItem("bus_driver_id");
 
@@ -223,18 +237,16 @@
     }
 
     function loginDriver() {
-      const inputVal = document
-        .getElementById("bus-id-input")
-        .value
-        .trim()
-        .toUpperCase();
+      const inputVal = document.getElementById("bus-id-input").value;
 
-      if (!inputVal) {
+      const code = normalizeBusCode(inputVal);
+
+      if (!code) {
         alert("يرجى إدخال كود الباص أولاً!");
         return;
       }
 
-      myBusId = inputVal;
+      myBusId = code;
       localStorage.setItem("bus_driver_id", myBusId);
 
       showDashboard();
@@ -339,7 +351,7 @@
       if (!myBusId) return;
 
       try {
-        const busRes = await fetch(BUS_API);
+        const busRes = await fetch(`${BUS_API}?bus_id=${encodeURIComponent(myBusId)}`);
 
         if (!busRes.ok) {
           throw new Error(`Bus API Error ${busRes.status}`);
@@ -348,10 +360,18 @@
         const busData = await busRes.json();
 
         const passengers = busData.passengers ?? busData.occupancy ?? 0;
-        const busCode = busData.bus_code || `BUS-0${busData.bus_id || 1}`;
+        const active = busData.active === true;
 
-        if (busCode === myBusId || myBusId === "BUS-01") {
-          document.getElementById("passenger-count").innerText = passengers;
+        document.getElementById("passenger-count").innerText = passengers;
+
+        if (active) {
+          isTracking = true;
+          updateButtonToRunning();
+          setStatusText("النظام يعمل الآن.", "ok");
+        } else {
+          isTracking = false;
+          updateButtonToStopped();
+          setStatusText("النظام متوقف.", "normal");
         }
 
         document.getElementById("last-sync-text").innerText =
@@ -385,7 +405,7 @@
         renderRequests(requests);
 
       } catch (err) {
-        console.log("Requests API not ready:", err);
+        console.log("Requests API error:", err);
         renderRequests([]);
       }
     }
@@ -465,7 +485,7 @@
 
     async function startTrip() {
       try {
-        await fetch(DRIVER_CONTROL_API, {
+        const res = await fetch(DRIVER_CONTROL_API, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -475,8 +495,14 @@
             action: "start"
           })
         });
+
+        if (!res.ok) {
+          throw new Error(`Start error ${res.status}`);
+        }
       } catch (err) {
-        console.log("Start API not ready:", err);
+        console.log("Start API error:", err);
+        alert("حدث خطأ أثناء بدء الرحلة.");
+        return;
       }
 
       isTracking = true;
@@ -501,6 +527,8 @@
       } else {
         setStatusText("يعمل.. الاعتماد على GPS الراسبيري.", "ok");
       }
+
+      loadDriverData();
     }
 
     async function stopTrip() {
@@ -510,7 +538,7 @@
       }
 
       try {
-        await fetch(DRIVER_CONTROL_API, {
+        const res = await fetch(DRIVER_CONTROL_API, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -520,8 +548,12 @@
             action: "stop"
           })
         });
+
+        if (!res.ok) {
+          throw new Error(`Stop error ${res.status}`);
+        }
       } catch (err) {
-        console.log("Stop API not ready:", err);
+        console.log("Stop API error:", err);
       }
 
       isTracking = false;
@@ -531,6 +563,8 @@
       document.getElementById("coords-text").innerText = "";
 
       setStatusText("النظام متوقف.", "normal");
+
+      loadDriverData();
     }
 
     async function sendPosition(position) {
@@ -538,7 +572,7 @@
       const lng = position.coords.longitude;
 
       try {
-        await fetch(DRIVER_LOCATION_API, {
+        const res = await fetch(DRIVER_LOCATION_API, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -550,8 +584,12 @@
             timestamp: Math.floor(Date.now() / 1000)
           })
         });
+
+        if (!res.ok) {
+          throw new Error(`Location error ${res.status}`);
+        }
       } catch (err) {
-        console.log("Driver location API not ready:", err);
+        console.log("Driver location API error:", err);
       }
 
       document.getElementById("coords-text").innerText =
@@ -570,7 +608,7 @@
       }
 
       try {
-        await fetch(DRIVER_CONTROL_API, {
+        const res = await fetch(DRIVER_CONTROL_API, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -580,18 +618,23 @@
             action: "reset"
           })
         });
+
+        if (!res.ok) {
+          throw new Error(`Reset error ${res.status}`);
+        }
       } catch (err) {
-        console.log("Reset API not ready:", err);
+        console.log("Reset API error:", err);
       }
 
       document.getElementById("passenger-count").innerText = "0";
+      loadDriverData();
     }
 
     async function clearRequest(id) {
       if (!id) return;
 
       try {
-        await fetch(REMOVE_REQUEST_API, {
+        const res = await fetch(REMOVE_REQUEST_API, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -601,8 +644,12 @@
             request_id: id
           })
         });
+
+        if (!res.ok) {
+          throw new Error(`Remove request error ${res.status}`);
+        }
       } catch (err) {
-        console.log("Remove request API not ready:", err);
+        console.log("Remove request API error:", err);
       }
 
       loadDriverData();

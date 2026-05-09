@@ -25,15 +25,27 @@
     }
 
     #map {
-      height: 520px;
+      height: 540px;
       width: 100%;
       border-radius: 12px;
       z-index: 1;
     }
 
-    .bus-icon {
+    .bus-icon-active {
       font-size: 28px;
       color: #2563eb;
+      text-shadow: 0 0 5px white;
+    }
+
+    .bus-icon-inactive {
+      font-size: 28px;
+      color: #9ca3af;
+      text-shadow: 0 0 5px white;
+    }
+
+    .bus-icon-emergency {
+      font-size: 30px;
+      color: #dc2626;
       text-shadow: 0 0 5px white;
     }
 
@@ -79,7 +91,7 @@
     </header>
 
     <!-- Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
 
       <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-blue-500">
         <p class="text-gray-400 text-xs mb-1">الباص المحدد حالياً</p>
@@ -110,6 +122,13 @@
         </p>
       </div>
 
+      <div class="bg-white p-5 rounded-2xl shadow-sm border-r-4 border-gray-500">
+        <p class="text-gray-400 text-xs mb-1">عدد الباصات</p>
+        <p class="text-3xl font-black text-gray-700">
+          <span id="fleet-count">0</span>
+        </p>
+      </div>
+
     </div>
 
     <!-- Main Panel -->
@@ -133,7 +152,16 @@
           class="bg-gray-800 hover:bg-black text-white font-bold py-3 px-8 rounded-full shadow-md transition"
         >
           <i class="fa-solid fa-crosshairs mr-2"></i>
-          تتبع الباص
+          تتبع الباص المحدد
+        </button>
+
+        <button
+          id="next-btn"
+          onclick="cycleNextBus()"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-md transition"
+        >
+          <i class="fa-solid fa-rotate mr-2"></i>
+          الباص التالي
         </button>
 
         <button
@@ -151,26 +179,37 @@
 
       <div id="map" class="border border-gray-100 shadow-inner"></div>
 
+      <div class="mt-4 flex flex-wrap justify-center gap-3 text-xs">
+        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-bus"></i> نشط
+        </span>
+        <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-bus"></i> متوقف
+        </span>
+        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
+          <i class="fa-solid fa-triangle-exclamation"></i> طوارئ
+        </span>
+      </div>
+
     </div>
 
   </div>
 
   <script>
     // ======================================================
-    // AWS API Gateway URL
+    // AWS API Gateway
     // ======================================================
     const API_BASE = "https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/prod";
 
-    // لو Route الطلب مش جاهز، الصفحة هتفضل تعرض الباص عادي.
-    const BUS_API = `${API_BASE}/buses`;
+    const BUSES_API = `${API_BASE}/buses`;
     const REQUEST_API = `${API_BASE}/request`;
     const REMOVE_REQUEST_API = `${API_BASE}/request/remove`;
 
     // ======================================================
     // Map Setup
     // ======================================================
-    const DEFAULT_LAT = 30.1234;
-    const DEFAULT_LNG = 28.9876;
+    const DEFAULT_LAT = 30.8339;
+    const DEFAULT_LNG = 28.9151;
 
     let map = L.map("map").setView([DEFAULT_LAT, DEFAULT_LNG], 14);
 
@@ -179,12 +218,22 @@
       attribution: "© OpenStreetMap"
     }).addTo(map);
 
-    const busIcon = L.divIcon({
-      html: '<i class="fa-solid fa-bus bus-icon"></i>',
-      className: "custom-div-icon",
-      iconSize: [35, 35],
-      iconAnchor: [17, 17]
-    });
+    function getBusIcon(bus) {
+      let iconClass = "bus-icon-active";
+
+      if (bus.emergency) {
+        iconClass = "bus-icon-emergency";
+      } else if (!bus.active) {
+        iconClass = "bus-icon-inactive";
+      }
+
+      return L.divIcon({
+        html: `<i class="fa-solid fa-bus ${iconClass}"></i>`,
+        className: "custom-div-icon",
+        iconSize: [35, 35],
+        iconAnchor: [17, 17]
+      });
+    }
 
     const passengerIcon = L.divIcon({
       html: '<i class="fa-solid fa-person-walking passenger-icon"></i>',
@@ -197,9 +246,9 @@
     // State
     // ======================================================
     let fleet = {};
+    let busMarkers = {};
     let selectedBusId = null;
 
-    let busMarker = null;
     let passengerMarker = null;
     let distanceLine = null;
 
@@ -214,7 +263,7 @@
     // ======================================================
     function normalizeBusData(data) {
       const busNumber = data.bus_id ?? 1;
-      const busCode = data.bus_code || `BUS-0${busNumber}`;
+      const busCode = data.bus_code || `BUS-${String(busNumber).padStart(2, "0")}`;
 
       const lat = Number(data.lat ?? data.latitude);
       const lng = Number(data.lng ?? data.longitude);
@@ -229,11 +278,12 @@
         lng,
         passengers,
         max_capacity: maxCapacity,
-        active: data.active !== false,
+        active: data.active === true,
         timestamp: data.timestamp ?? null,
         emergency: data.emergency === true,
         eta: data.eta ?? null,
-        action: data.action ?? ""
+        action: data.action ?? "",
+        source: data.source ?? ""
       };
     }
 
@@ -252,7 +302,6 @@
     function formatTimestamp(timestamp) {
       if (!timestamp) return new Date().toLocaleTimeString("ar-EG");
 
-      // Raspberry sends seconds, JS Date needs milliseconds.
       const t = Number(timestamp);
       const ms = t < 1000000000000 ? t * 1000 : t;
 
@@ -261,6 +310,10 @@
 
     function isValidLocation(lat, lng) {
       return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }
+
+    function getFleetArray() {
+      return Object.values(fleet);
     }
 
     // ======================================================
@@ -343,7 +396,7 @@
       } else {
         reqBtn.disabled = true;
         reqBtn.classList.add("opacity-50", "cursor-not-allowed");
-        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> حدد باصاً لطلب الركوب';
+        reqBtn.innerHTML = '<i class="fa-solid fa-hand-wave mr-2"></i> حدد باصاً نشطاً لطلب الركوب';
       }
     }
 
@@ -357,6 +410,9 @@
       if (bus.emergency) {
         emergencyEl.innerText = "طوارئ نشطة";
         emergencyEl.className = "text-sm font-bold text-red-600 pulse";
+      } else if (!bus.active) {
+        emergencyEl.innerText = "الباص متوقف";
+        emergencyEl.className = "text-sm font-bold text-gray-500";
       } else {
         emergencyEl.innerText = "طبيعي";
         emergencyEl.className = "text-sm font-bold text-green-600";
@@ -369,37 +425,43 @@
         return;
       }
 
-      selectedBusId = bus.bus_id;
       fleet[bus.bus_id] = bus;
 
-      if (!busMarker) {
-        busMarker = L.marker([bus.lat, bus.lng], {
-          icon: busIcon,
+      if (!busMarkers[bus.bus_id]) {
+        busMarkers[bus.bus_id] = L.marker([bus.lat, bus.lng], {
+          icon: getBusIcon(bus),
           zIndexOffset: 1000
         }).addTo(map);
 
-        busMarker.on("click", () => {
+        busMarkers[bus.bus_id].on("click", () => {
           selectedBusId = bus.bus_id;
-          focusOnSelectedBus();
+          updateCards(bus);
+          updateRequestButtonUI(isRequested);
+          busMarkers[bus.bus_id].openPopup();
         });
       } else {
-        busMarker.setLatLng([bus.lat, bus.lng]);
+        busMarkers[bus.bus_id].setLatLng([bus.lat, bus.lng]);
+        busMarkers[bus.bus_id].setIcon(getBusIcon(bus));
       }
 
-      busMarker.bindPopup(`
+      busMarkers[bus.bus_id].bindPopup(`
         <div style="text-align:right">
           <b>باص ${bus.bus_id}</b><br>
           الركاب: ${bus.passengers}/${bus.max_capacity}<br>
           الحالة: ${bus.active ? "نشط" : "متوقف"}<br>
-          ${bus.emergency ? "🚨 طوارئ" : "✅ طبيعي"}
+          ${bus.emergency ? "🚨 طوارئ" : "✅ طبيعي"}<br>
+          <small>${bus.source || ""}</small>
         </div>
       `);
 
-      updateCards(bus);
-      updateRequestButtonUI(isRequested);
+      if (!selectedBusId) {
+        selectedBusId = bus.bus_id;
+        updateCards(bus);
+        map.flyTo([bus.lat, bus.lng], 15);
+      }
 
-      if (showLine) {
-        updateDistanceUI();
+      if (selectedBusId === bus.bus_id) {
+        updateCards(bus);
       }
     }
 
@@ -418,28 +480,40 @@
     }
 
     // ======================================================
-    // AWS Load Data
+    // AWS Load Multi-Buses
     // ======================================================
     async function loadBusFromAWS() {
       try {
-        const res = await fetch(BUS_API);
+        const res = await fetch(BUSES_API);
 
         if (!res.ok) {
           throw new Error(`API Error: ${res.status}`);
         }
 
         const data = await res.json();
-        console.log("AWS BUS DATA:", data);
+        console.log("AWS BUSES DATA:", data);
 
-        const bus = normalizeBusData(data);
+        const buses = data.items || [];
+        document.getElementById("fleet-count").innerText = buses.length;
 
-        if (!isValidLocation(bus.lat, bus.lng)) {
-          setStatusError("GPS غير صالح");
+        if (buses.length === 0) {
+          setStatusError("لا توجد باصات");
           return;
         }
 
-        drawBus(bus);
+        buses.forEach(rawBus => {
+          const bus = normalizeBusData(rawBus);
+
+          if (isValidLocation(bus.lat, bus.lng)) {
+            drawBus(bus);
+          }
+        });
+
         setStatusConnected();
+
+        if (showLine) {
+          updateDistanceUI();
+        }
 
       } catch (err) {
         console.log("AWS API Error:", err);
@@ -452,7 +526,7 @@
     // ======================================================
     function focusOnSelectedBus() {
       if (!selectedBusId || !fleet[selectedBusId]) {
-        alert("لا يوجد باص متاح حالياً.");
+        alert("لا يوجد باص محدد حالياً.");
         return;
       }
 
@@ -468,9 +542,28 @@
         duration: 1.0
       });
 
-      if (busMarker) {
-        busMarker.openPopup();
+      if (busMarkers[selectedBusId]) {
+        busMarkers[selectedBusId].openPopup();
       }
+    }
+
+    function cycleNextBus() {
+      const buses = getFleetArray().filter(bus => isValidLocation(bus.lat, bus.lng));
+
+      if (buses.length === 0) {
+        alert("لا توجد باصات متاحة.");
+        return;
+      }
+
+      const ids = buses.map(bus => bus.bus_id);
+      const currentIndex = ids.indexOf(selectedBusId);
+      const nextIndex = (currentIndex + 1) % ids.length;
+
+      selectedBusId = ids[nextIndex];
+
+      updateCards(fleet[selectedBusId]);
+      updateRequestButtonUI(isRequested);
+      focusOnSelectedBus();
     }
 
     async function togglePickupRequest() {
@@ -491,7 +584,7 @@
             });
           }
         } catch (err) {
-          console.log("Remove request API not ready:", err);
+          console.log("Remove request error:", err);
         }
 
         clearSessionUI();
@@ -507,7 +600,7 @@
       }
 
       if (!selectedBusId || !fleet[selectedBusId] || !fleet[selectedBusId].active) {
-        alert("يرجى تتبع باص نشط أولاً لطلب ركوبه.");
+        alert("يرجى اختيار باص نشط أولاً لطلب ركوبه.");
         return;
       }
 
@@ -560,9 +653,9 @@
           statusLabel.className = "text-xs text-green-600 font-bold text-center mb-2";
 
         } catch (err) {
-          console.log("Request API not ready:", err);
-          statusLabel.innerText = "⚠️ تم حفظ الطلب محلياً، لكن API الطلبات غير جاهز.";
-          statusLabel.className = "text-xs text-orange-600 font-bold text-center mb-2";
+          console.log("Request API error:", err);
+          statusLabel.innerText = "⚠️ حدث خطأ أثناء إرسال الطلب.";
+          statusLabel.className = "text-xs text-red-600 font-bold text-center mb-2";
         }
 
         isRequested = true;
@@ -635,7 +728,7 @@
 
       distanceLine.bindTooltip(`
         <div class="text-center border-r-4 border-blue-500 pr-2">
-          <div class="text-gray-500 text-[10px]">المسافة عن الباص:</div>
+          <div class="text-gray-500 text-[10px]">المسافة عن الباص ${selectedBusId}:</div>
           <b class="text-blue-600">${km} كم</b><br>
           <span class="text-gray-500 text-[10px]">يصل خلال:</span>
           <b class="text-green-600">~${timeMins} دقيقة</b>
