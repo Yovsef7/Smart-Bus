@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>تطبيق السائق الذكي - Smart Bus AWS</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  />
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f9fafb;
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.55; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+
+<body class="p-4 flex flex-col items-center justify-center min-h-screen">
+
+  <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+
+    <!-- LOGIN SECTION -->
+    <div id="login-section" class="p-8 text-center">
+      <i class="fa-solid fa-bus text-6xl text-blue-600 mb-6 drop-shadow-md"></i>
+
+      <h2 class="text-2xl font-black mb-2 text-gray-800">
+        بوابة السائقين
+      </h2>
+
+      <p class="text-xs text-gray-500 mb-8">
+        أدخل كود الباص المخصص لك لبدء رحلتك
+      </p>
+
+      <input
+        type="text"
+        id="bus-id-input"
+        placeholder="مثال: BUS-01"
+        class="w-full p-4 border-2 border-gray-200 rounded-2xl mb-6 text-center text-lg font-bold text-blue-600 focus:outline-none focus:border-blue-500 uppercase"
+      />
+
+      <button
+        onclick="loginDriver()"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transition duration-300"
+      >
+        تسجيل الدخول
+        <i class="fa-solid fa-arrow-left mr-2"></i>
+      </button>
+
+      <p class="text-[11px] text-gray-400 mt-5 leading-6">
+        هذا التطبيق يعمل من خلال AWS API Gateway + Lambda + DynamoDB
+        <br />
+        بدون HiveMQ وبدون Backend Server
+      </p>
+    </div>
+
+    <!-- DASHBOARD SECTION -->
+    <div id="dashboard-section" class="hidden">
+
+      <div class="bg-blue-600 p-6 text-center text-white relative">
+
+        <button
+          onclick="logoutDriver()"
+          class="absolute top-4 left-4 text-blue-200 hover:text-white transition"
+          title="تسجيل خروج"
+        >
+          <i class="fa-solid fa-right-from-bracket text-xl"></i>
+        </button>
+
+        <i class="fa-solid fa-bus-simple text-5xl mb-3 drop-shadow-md"></i>
+
+        <h1 class="text-2xl font-black mb-1">
+          لوحة السائق
+        </h1>
+
+        <p id="display-bus-id" class="text-blue-200 text-sm font-mono">
+          الباص: ...
+        </p>
+
+        <p id="cloud-status" class="text-[11px] mt-2 text-blue-100">
+          بانتظار الاتصال بـ AWS...
+        </p>
+      </div>
+
+      <div class="p-6">
+
+        <!-- Passenger Counter -->
+        <div class="flex justify-between items-center mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+          <div>
+            <p class="text-xs text-gray-500 font-bold mb-1">
+              الركاب بالداخل
+            </p>
+
+            <p class="text-4xl font-black text-gray-800" id="passenger-count">
+              0
+            </p>
+          </div>
+
+          <button
+            onclick="resetPassengers()"
+            class="bg-red-50 hover:bg-red-100 text-red-500 p-3 rounded-xl transition"
+          >
+            <i class="fa-solid fa-rotate-right"></i>
+            تصفير
+          </button>
+        </div>
+
+        <!-- GPS Option -->
+        <div class="flex items-center mb-6 bg-blue-50 p-3 rounded-xl border border-blue-100">
+          <input
+            type="checkbox"
+            id="use-phone-gps"
+            checked
+            class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+          />
+
+          <label for="use-phone-gps" class="mr-3 text-sm font-bold text-blue-800">
+            تفعيل GPS الهاتف
+          </label>
+        </div>
+
+        <!-- Start / Stop -->
+        <button
+          id="track-btn"
+          onclick="toggleTracking()"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transition duration-300 mb-4"
+        >
+          <i id="btn-icon" class="fa-solid fa-play mr-2"></i>
+          <span id="btn-text">بدء الرحلة</span>
+        </button>
+
+        <!-- Status Box -->
+        <div class="text-center bg-gray-50 p-3 rounded-xl border border-gray-100 mb-6">
+          <p id="status-text" class="text-xs font-bold text-gray-500 mb-1">
+            النظام متوقف.
+          </p>
+
+          <p id="coords-text" class="text-[10px] text-gray-400 font-mono"></p>
+
+          <p id="last-sync-text" class="text-[10px] text-gray-400 font-mono mt-1"></p>
+        </div>
+
+        <!-- Requests -->
+        <div class="mt-6 pt-4 border-t border-gray-100">
+
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-sm font-bold text-gray-700">
+              <i class="fa-solid fa-bell text-yellow-500"></i>
+              طلبات الركوب
+            </h3>
+
+            <button
+              onclick="loadDriverData()"
+              class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-gray-600 font-bold"
+            >
+              تحديث
+            </button>
+          </div>
+
+          <div id="requests-container" class="space-y-2">
+            <p id="no-requests" class="text-xs text-gray-400 text-center">
+              لا توجد طلبات حالياً.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ======================================================
+    // AWS API Gateway
+    // ======================================================
+
+    const API_BASE = "https://wdahwudddj.execute-api.eu-north-1.amazonaws.com/proddd";
+
+    const BUS_API = `${API_BASE}/bus`;
+    const REQUESTS_API = `${API_BASE}/requests`;
+    const REMOVE_REQUEST_API = `${API_BASE}/request/remove`;
+    const DRIVER_CONTROL_API = `${API_BASE}/driver/control`;
+    const DRIVER_LOCATION_API = `${API_BASE}/driver/location`;
+
+    // ======================================================
+    // Global State
+    // ======================================================
+
+    let myBusId = null;
+    let trackingId = null;
+    let isTracking = false;
+    let refreshInterval = null;
+
+    // ======================================================
+    // Session
+    // ======================================================
+
+    function checkSession() {
+      const savedId = localStorage.getItem("bus_driver_id");
+
+      if (savedId) {
+        myBusId = savedId;
+        showDashboard();
+      }
+    }
+
+    function loginDriver() {
+      const inputVal = document
+        .getElementById("bus-id-input")
+        .value
+        .trim()
+        .toUpperCase();
+
+      if (!inputVal) {
+        alert("يرجى إدخال كود الباص أولاً!");
+        return;
+      }
+
+      myBusId = inputVal;
+      localStorage.setItem("bus_driver_id", myBusId);
+
+      showDashboard();
+    }
+
+    async function logoutDriver() {
+      if (isTracking) {
+        await stopTrip();
+      }
+
+      localStorage.removeItem("bus_driver_id");
+
+      myBusId = null;
+
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+
+      document.getElementById("dashboard-section").classList.add("hidden");
+      document.getElementById("login-section").classList.remove("hidden");
+    }
+
+    function showDashboard() {
+      document.getElementById("login-section").classList.add("hidden");
+      document.getElementById("dashboard-section").classList.remove("hidden");
+
+      document.getElementById("display-bus-id").innerText = `الباص: ${myBusId}`;
+
+      setCloudStatus("متصل بواجهة AWS", "ok");
+
+      loadDriverData();
+
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+
+      refreshInterval = setInterval(loadDriverData, 3000);
+    }
+
+    // ======================================================
+    // UI Helpers
+    // ======================================================
+
+    function setCloudStatus(message, type = "normal") {
+      const el = document.getElementById("cloud-status");
+
+      el.innerText = message;
+
+      if (type === "ok") {
+        el.className = "text-[11px] mt-2 text-green-100 font-bold";
+      } else if (type === "error") {
+        el.className = "text-[11px] mt-2 text-red-100 font-bold";
+      } else {
+        el.className = "text-[11px] mt-2 text-blue-100";
+      }
+    }
+
+    function setStatusText(message, type = "normal") {
+      const el = document.getElementById("status-text");
+
+      el.innerText = message;
+
+      if (type === "ok") {
+        el.className = "text-xs font-bold text-green-600 mb-1";
+      } else if (type === "error") {
+        el.className = "text-xs font-bold text-red-600 mb-1";
+      } else {
+        el.className = "text-xs font-bold text-gray-500 mb-1";
+      }
+    }
+
+    function updateButtonToRunning() {
+      const btn = document.getElementById("track-btn");
+      const btnText = document.getElementById("btn-text");
+      const btnIcon = document.getElementById("btn-icon");
+
+      btn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-lg mb-4 pulse";
+      btnText.innerText = "إنهاء الرحلة";
+      btnIcon.className = "fa-solid fa-stop mr-2";
+    }
+
+    function updateButtonToStopped() {
+      const btn = document.getElementById("track-btn");
+      const btnText = document.getElementById("btn-text");
+      const btnIcon = document.getElementById("btn-icon");
+
+      btn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transition duration-300 mb-4";
+      btnText.innerText = "بدء الرحلة";
+      btnIcon.className = "fa-solid fa-play mr-2";
+    }
+
+    function formatTime() {
+      return new Date().toLocaleTimeString("ar-EG");
+    }
+
+    // ======================================================
+    // Load Data from AWS
+    // ======================================================
+
+    async function loadDriverData() {
+      if (!myBusId) return;
+
+      try {
+        const busRes = await fetch(BUS_API);
+
+        if (!busRes.ok) {
+          throw new Error(`Bus API Error ${busRes.status}`);
+        }
+
+        const busData = await busRes.json();
+
+        const passengers = busData.passengers ?? busData.occupancy ?? 0;
+        const busCode = busData.bus_code || `BUS-0${busData.bus_id || 1}`;
+
+        if (busCode === myBusId || myBusId === "BUS-01") {
+          document.getElementById("passenger-count").innerText = passengers;
+        }
+
+        document.getElementById("last-sync-text").innerText =
+          `آخر مزامنة: ${formatTime()}`;
+
+        setCloudStatus("متصل بـ AWS", "ok");
+
+        await loadRequests();
+
+      } catch (err) {
+        console.log("Driver load error:", err);
+        setCloudStatus("خطأ في الاتصال بـ AWS", "error");
+      }
+    }
+
+    async function loadRequests() {
+      try {
+        const res = await fetch(`${REQUESTS_API}/${encodeURIComponent(myBusId)}`);
+
+        if (!res.ok) {
+          renderRequests([]);
+          return;
+        }
+
+        const data = await res.json();
+
+        const requests = Array.isArray(data)
+          ? data
+          : (data.items || data.requests || []);
+
+        renderRequests(requests);
+
+      } catch (err) {
+        console.log("Requests API not ready:", err);
+        renderRequests([]);
+      }
+    }
+
+    function renderRequests(requests) {
+      const container = document.getElementById("requests-container");
+
+      container.innerHTML = "";
+
+      if (!requests || requests.length === 0) {
+        container.innerHTML =
+          '<p class="text-xs text-gray-400 text-center">لا توجد طلبات حالياً.</p>';
+        return;
+      }
+
+      requests
+        .slice()
+        .reverse()
+        .forEach(req => {
+          const requestId = req.request_id || req.id;
+          const lat = req.lat;
+          const lng = req.lng;
+
+          const card = document.createElement("div");
+
+          card.className =
+            "bg-orange-50 border-r-4 border-orange-500 p-3 rounded-xl shadow-sm flex justify-between items-center";
+
+          card.innerHTML = `
+            <div>
+              <p class="text-xs font-bold text-gray-800">
+                راكب في الانتظار
+              </p>
+              <p class="text-[10px] text-gray-500">
+                ${req.time || "وقت غير معروف"}
+              </p>
+              <p class="text-[10px] text-gray-400 font-mono">
+                ${lat}, ${lng}
+              </p>
+            </div>
+
+            <div class="flex gap-2">
+              <a
+                href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                target="_blank"
+                class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg text-xs font-bold shadow transition"
+              >
+                <i class="fa-solid fa-location-arrow"></i>
+                توجيه
+              </a>
+
+              <button
+                onclick="clearRequest('${requestId}')"
+                class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg text-xs font-bold shadow transition"
+              >
+                <i class="fa-solid fa-check"></i>
+                ركب
+              </button>
+            </div>
+          `;
+
+          container.appendChild(card);
+        });
+    }
+
+    // ======================================================
+    // Driver Actions
+    // ======================================================
+
+    async function toggleTracking() {
+      if (!isTracking) {
+        await startTrip();
+      } else {
+        await stopTrip();
+      }
+    }
+
+    async function startTrip() {
+      try {
+        await fetch(DRIVER_CONTROL_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            bus_id: myBusId,
+            action: "start"
+          })
+        });
+      } catch (err) {
+        console.log("Start API not ready:", err);
+      }
+
+      isTracking = true;
+
+      updateButtonToRunning();
+      setStatusText("النظام يعمل الآن.", "ok");
+
+      const usePhoneGps = document.getElementById("use-phone-gps").checked;
+
+      if (usePhoneGps && navigator.geolocation) {
+        trackingId = navigator.geolocation.watchPosition(
+          sendPosition,
+          showGpsError,
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 10000
+          }
+        );
+
+        setStatusText("يعمل.. إرسال GPS الهاتف إلى AWS", "ok");
+      } else {
+        setStatusText("يعمل.. الاعتماد على GPS الراسبيري.", "ok");
+      }
+    }
+
+    async function stopTrip() {
+      if (trackingId) {
+        navigator.geolocation.clearWatch(trackingId);
+        trackingId = null;
+      }
+
+      try {
+        await fetch(DRIVER_CONTROL_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            bus_id: myBusId,
+            action: "stop"
+          })
+        });
+      } catch (err) {
+        console.log("Stop API not ready:", err);
+      }
+
+      isTracking = false;
+
+      updateButtonToStopped();
+
+      document.getElementById("coords-text").innerText = "";
+
+      setStatusText("النظام متوقف.", "normal");
+    }
+
+    async function sendPosition(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      try {
+        await fetch(DRIVER_LOCATION_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            bus_id: myBusId,
+            lat,
+            lng,
+            timestamp: Math.floor(Date.now() / 1000)
+          })
+        });
+      } catch (err) {
+        console.log("Driver location API not ready:", err);
+      }
+
+      document.getElementById("coords-text").innerText =
+        `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+
+    function showGpsError(error) {
+      console.log("GPS error:", error);
+
+      setStatusText("خطأ في قراءة GPS الهاتف.", "error");
+    }
+
+    async function resetPassengers() {
+      if (!confirm("هل أنت متأكد من تصفير عداد الركاب؟")) {
+        return;
+      }
+
+      try {
+        await fetch(DRIVER_CONTROL_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            bus_id: myBusId,
+            action: "reset"
+          })
+        });
+      } catch (err) {
+        console.log("Reset API not ready:", err);
+      }
+
+      document.getElementById("passenger-count").innerText = "0";
+    }
+
+    async function clearRequest(id) {
+      if (!id) return;
+
+      try {
+        await fetch(REMOVE_REQUEST_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            bus_id: myBusId,
+            request_id: id
+          })
+        });
+      } catch (err) {
+        console.log("Remove request API not ready:", err);
+      }
+
+      loadDriverData();
+    }
+
+    // ======================================================
+    // Start
+    // ======================================================
+
+    checkSession();
+  </script>
+
+</body>
+</html>
